@@ -1,0 +1,103 @@
+openapi: 3.0.3
+info:
+  title: UPC Lookup Service API
+  description: API for looking up product details by UPC-A or EAN-13 code using the Barcode Lookup API.
+  version: 1.0.0
+servers:
+  - url: https://your-render-url.onrender.com
+    description: Production server
+  - url: http://localhost:5000
+    description: Local development server
+paths:
+  /lookup-upc:
+    post:
+      summary: Lookup product details by UPC-A or EAN-13 code
+      description: Returns product details (name, brand, description, manufacturer, category, image URL) for a given UPC-A (12 digits) or EAN-13 (13 digits) code. Some EAN-13 codes may bypass strict checksum validation if accepted by the Barcode Lookup API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                upc:
+                  type: string
+                  description: The UPC-A (12 digits) or EAN-13 (13 digits) code
+                  example: "3614272049529"
+              required:
+                - upc
+      responses:
+        '200':
+          description: Successful lookup
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Product name (title)
+                    example: "Yves Saint Laurent Women's Volupte Tint-in-Balm Nourishing Glow - Underground Pink"
+                  brand:
+                    type: string
+                    description: Product brand
+                    example: "Yves Saint Laurent"
+                  description:
+                    type: string
+                    description: Product description
+                    example: "A new hybrid lipstick combining melting balm care with glowing sheer color..."
+                  manufacturer:
+                    type: string
+                    description: Product manufacturer
+                    example: "Yves Saint Laurent"
+                  category:
+                    type: string
+                    description: Product category
+                    example: "Health & Beauty > Personal Care > Cosmetics > Makeup > Lip Makeup > Lipstick"
+                  image:
+                    type: string
+                    description: URL of the product image
+                    example: "https://images.barcodelookup.com/9308/93082435-1.jpg"
+        '400':
+          description: Invalid UPC/EAN code format or missing code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid UPC code format (must be 12 or 13 digits)"
+        '404':
+          description: No product found for the UPC/EAN code
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "No product found for this UPC code"
+        '500':
+          description: Server error or API key not set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Barcode API key not set"
+        '502':
+          description: Barcode Lookup API request failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Barcode Lookup API request failed: timeout"
+tags:
+  - name: UPC Lookup
+    description: Operations related to UPC/EAN code lookup

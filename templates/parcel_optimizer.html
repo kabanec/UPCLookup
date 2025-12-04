@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FedEx Parcel Dimension Optimizer</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .optimizer-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .input-section {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .results-section {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .dimension-card {
+            background: #e8f4f8;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #2196F3;
+        }
+        .optimal-card {
+            background: #e8f5e9;
+            border-left: 4px solid #4CAF50;
+        }
+        .weight-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .info-box {
+            padding: 10px;
+            background: #fff;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .info-box strong {
+            display: block;
+            color: #555;
+            margin-bottom: 5px;
+        }
+        .chart-container {
+            margin: 20px 0;
+            min-height: 300px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        table th, table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        table th {
+            background: #2196F3;
+            color: white;
+        }
+        table tr:hover {
+            background: #f5f5f5;
+        }
+        .highlight {
+            background: #ffffcc !important;
+            font-weight: bold;
+        }
+        .nav-links {
+            margin-bottom: 20px;
+        }
+        .nav-links a {
+            margin-right: 15px;
+            color: #2196F3;
+            text-decoration: none;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="optimizer-container">
+        <div class="nav-links">
+            <a href="/">← Back to UPC Lookup</a>
+        </div>
+
+        <h1>FedEx Parcel Dimension Optimizer</h1>
+        <p>Find the optimal parcel dimensions for your shipment from Poland to USA based on FedEx dimensional weight pricing.</p>
+
+        <div class="input-section">
+            <h2>Step 1: Add Products to Parcel</h2>
+            <div class="form-group">
+                <label for="product_search">Search Products (Autocomplete)</label>
+                <input type="text" id="product_search" placeholder="Type product name, brand, or category..." autocomplete="off">
+                <div id="autocomplete_results" style="display: none; position: absolute; background: white; border: 1px solid #ddd; max-height: 300px; overflow-y: auto; z-index: 1000; width: 400px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <button type="button" id="add_custom_product_btn" class="btn-primary" style="background: #27ae60;">+ Add Custom Product (Unknown Dimensions)</button>
+            </div>
+
+            <div id="selected_products" style="margin-top: 20px;">
+                <h3>Selected Products (0)</h3>
+                <div id="products_list"></div>
+            </div>
+
+            <div id="cooler_brick_section" style="display: none; margin-top: 15px; padding: 15px; background: #e8f4f8; border-radius: 5px;">
+                <h4>❄️ Cold Chain Packaging Required</h4>
+                <p style="font-size: 0.9rem; color: #666; margin-bottom: 15px;">
+                    Your selection includes temperature-sensitive products. Add cooler bricks/ice packs to maintain cold chain.
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <label for="box_wall_thickness">Box Wall Thickness (inches)</label>
+                    <input type="number" id="box_wall_thickness" step="0.1" min="0.1" value="1" placeholder="1" style="width: 120px;">
+                    <small style="display: block; color: #666; margin-top: 5px;">Insulation thickness on all sides (default: 1 inch = 2.54cm)</small>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                    <div>
+                        <label for="brick_length">Brick Length (cm)</label>
+                        <input type="number" id="brick_length" step="0.1" min="0.1" value="10" placeholder="10">
+                    </div>
+                    <div>
+                        <label for="brick_width">Brick Width (cm)</label>
+                        <input type="number" id="brick_width" step="0.1" min="0.1" value="5" placeholder="5">
+                    </div>
+                    <div>
+                        <label for="brick_height">Brick Height (cm)</label>
+                        <input type="number" id="brick_height" step="0.1" min="0.1" value="1" placeholder="1">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                    <div>
+                        <label for="brick_weight">Brick Weight (g)</label>
+                        <input type="number" id="brick_weight" step="1" min="1" value="300" placeholder="300">
+                    </div>
+                    <div>
+                        <label for="brick_quantity">Quantity</label>
+                        <input type="number" id="brick_quantity" step="1" min="0" value="2" placeholder="2">
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" id="calculate_packing_btn" class="btn-primary" style="margin-top: 20px;">Calculate Required Box Size</button>
+        </div>
+
+        <div id="packing_results" class="results-section" style="display: none;">
+            <h2>Packing Analysis</h2>
+            <div id="packing_summary"></div>
+            <div id="packing_visualization"></div>
+        </div>
+
+        <div class="input-section">
+            <h2>Step 1.5: Custom Rate Card (Optional)</h2>
+            <p style="color: #666; margin-bottom: 15px;">
+                <strong>Default:</strong> Using built-in FedEx International rates (Poland → USA).<br>
+                Upload your own rate card to override the default rates.
+            </p>
+
+            <div class="form-group">
+                <label for="rate_card_file">Upload Rate Card (Excel/CSV)</label>
+                <input type="file" id="rate_card_file" accept=".xlsx,.xls,.csv">
+                <small>Format: Country | Weight (kg) | Price (USD)</small>
+            </div>
+
+            <div style="margin-top: 10px;">
+                <button type="button" id="manual_rate_entry_btn" class="btn-primary" style="background: #3498db;">📝 Manual Rate Entry</button>
+                <button type="button" id="clear_custom_rates_btn" class="btn-primary" style="background: #e74c3c; margin-left: 10px; display: none;">✕ Clear & Use Default</button>
+            </div>
+
+            <div id="custom_rates_display" style="margin-top: 15px; display: none; padding: 15px; background: #e8f5e9; border-radius: 5px; border-left: 4px solid #27ae60;">
+                <h4 style="margin-top: 0; color: #27ae60;">✓ Custom Rate Card Active</h4>
+                <div id="custom_rates_summary"></div>
+            </div>
+        </div>
+
+        <div class="input-section">
+            <h2>Step 2: Select Shipping Service (Optional - for rate calculation)</h2>
+            <div class="form-group">
+                <label for="service_type">FedEx Service Type</label>
+                <select id="service_type" required>
+                    <option value="international_priority">FedEx International Priority® (1-3 days)</option>
+                    <option value="international_economy">FedEx International Economy® (4-6 days)</option>
+                    <option value="international_connect_plus">FedEx International Connect Plus® (2-5 days)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="actual_weight">Actual Weight (kg)</label>
+                <input type="number" id="actual_weight" step="0.001" min="0.001" placeholder="e.g. 5.125 (5kg 125g)" required>
+                <small>Enter weight with up to 3 decimal places (e.g., 2.458 = 2kg 458g)</small>
+            </div>
+            <div class="form-group">
+                <label for="max_dimension">Maximum Single Dimension (cm) - Optional</label>
+                <input type="number" id="max_dimension" step="1" min="1" placeholder="e.g. 60">
+                <small>Leave empty for no constraint</small>
+            </div>
+            <button type="button" id="optimize_btn" class="btn-primary">Optimize Dimensions</button>
+        </div>
+
+        <div id="results" class="results-section" style="display: none;">
+            <h2>Optimization Results</h2>
+            <div id="summary"></div>
+            <div id="recommendations"></div>
+            <div id="detailed_table"></div>
+        </div>
+
+        <div class="results-section">
+            <h2>About Dimensional Weight</h2>
+            <p><strong>FedEx Dimensional Weight Formula:</strong> (Length × Width × Height in cm) ÷ 5000 = Dimensional Weight (kg)</p>
+            <p><strong>Billable Weight:</strong> The greater of actual weight or dimensional weight is used for billing.</p>
+            <p><strong>Optimization Goal:</strong> Find the best available box that maximizes volume while minimizing shipping cost.</p>
+
+            <h3>How It Works</h3>
+            <ul>
+                <li>The tool analyzes <strong>170+ predefined box sizes</strong> available for your shipments</li>
+                <li>When dimensional weight exceeds actual weight, you're paying for empty space</li>
+                <li>The optimizer finds boxes where dimensional weight ≤ actual weight (charged by actual weight only)</li>
+                <li>Among boxes with the same cost, the largest volume is recommended for maximum packing space</li>
+                <li>Boxes are ranked by cost first, then by volume to help you make the best choice</li>
+            </ul>
+
+            <h3>Understanding Results</h3>
+            <ul>
+                <li><strong>🏆 Best Price:</strong> Boxes offering the lowest shipping cost</li>
+                <li><strong>✅ Optimal:</strong> Boxes within 5% of the optimal volume threshold</li>
+                <li><strong>⚠️ High Waste:</strong> Dimensional weight is 20%+ over actual weight (paying extra)</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Custom Product Modal -->
+    <div id="custom_product_modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <h2>Add Custom Product</h2>
+            <div class="form-group">
+                <label for="custom_product_name">Product Name</label>
+                <input type="text" id="custom_product_name" placeholder="e.g. Custom Serum" required>
+            </div>
+            <div class="form-group">
+                <label for="custom_brand">Brand (Optional)</label>
+                <input type="text" id="custom_brand" placeholder="e.g. Custom Brand">
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                <div class="form-group">
+                    <label for="custom_length">Length</label>
+                    <input type="number" id="custom_length" step="0.1" min="0.1" placeholder="10" required>
+                </div>
+                <div class="form-group">
+                    <label for="custom_width">Width</label>
+                    <input type="number" id="custom_width" step="0.1" min="0.1" placeholder="5" required>
+                </div>
+                <div class="form-group">
+                    <label for="custom_height">Height</label>
+                    <input type="number" id="custom_height" step="0.1" min="0.1" placeholder="3" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="custom_uom">Unit of Measurement</label>
+                <select id="custom_uom">
+                    <option value="cm">Centimeters (cm)</option>
+                    <option value="mm">Millimeters (mm)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="custom_weight">Weight (grams)</label>
+                <input type="number" id="custom_weight" step="1" min="1" placeholder="50" required>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="custom_cooler">
+                    Requires Cold Chain (❄️)
+                </label>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="button" id="save_custom_product_btn" class="btn-primary">Add Product</button>
+                <button type="button" id="cancel_custom_product_btn" class="btn-primary" style="background: #95a5a6;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Rate Entry Modal -->
+    <div id="manual_rate_modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+            <h2>Manual Rate Entry</h2>
+            <p style="color: #666; margin-bottom: 15px; font-size: 0.9rem;">Enter shipping rates line by line. Each rate should have: Country, Weight (kg), and Price (USD).</p>
+
+            <div style="margin-bottom: 15px;">
+                <div class="form-group" style="margin-bottom: 10px;">
+                    <label for="rate_country">Country</label>
+                    <select id="rate_country" style="width: 100%;">
+                        <option value="Poland">Poland</option>
+                        <option value="USA">USA</option>
+                        <option value="UK">United Kingdom</option>
+                        <option value="Germany">Germany</option>
+                        <option value="France">France</option>
+                        <option value="Canada">Canada</option>
+                        <option value="Australia">Australia</option>
+                        <option value="Japan">Japan</option>
+                        <option value="China">China</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end;">
+                    <div class="form-group">
+                        <label for="rate_weight">Weight (kg)</label>
+                        <input type="number" id="rate_weight" step="0.1" min="0.1" placeholder="1.0" style="width: 100%;">
+                    </div>
+                    <div class="form-group">
+                        <label for="rate_price">Price (USD)</label>
+                        <input type="number" id="rate_price" step="0.01" min="0.01" placeholder="75.00" style="width: 100%;">
+                    </div>
+                    <button type="button" id="add_rate_btn" class="btn-primary" style="white-space: nowrap;">Add Rate</button>
+                </div>
+            </div>
+
+            <div id="manual_rates_list" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-bottom: 15px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid #ddd;">
+                            <th style="padding: 5px; text-align: left;">Country</th>
+                            <th style="padding: 5px; text-align: left;">Weight</th>
+                            <th style="padding: 5px; text-align: left;">Price</th>
+                            <th style="padding: 5px; text-align: center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="manual_rates_tbody">
+                        <tr><td colspan="4" style="text-align: center; color: #999; padding: 20px;">No rates added yet</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="button" id="save_manual_rates_btn" class="btn-primary">Save Rate Card</button>
+                <button type="button" id="cancel_manual_rates_btn" class="btn-primary" style="background: #95a5a6;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // FedEx Rate Card for Poland to USA (Zone A - Americas)
+        // Rates in USD (converted from PLN at approximate exchange rate)
+        // Based on 2025 FedEx International rates
+        const RATE_CARD = {
+            international_priority: {
+                name: "FedEx International Priority®",
+                transit: "1-3 business days",
+                rates: [
+                    { maxWeight: 0.5, rate: 75.00 },
+                    { maxWeight: 1.0, rate: 85.00 },
+                    { maxWeight: 2.0, rate: 110.00 },
+                    { maxWeight: 3.0, rate: 135.00 },
+                    { maxWeight: 4.0, rate: 145.00 },
+                    { maxWeight: 5.0, rate: 155.00 },
+                    { maxWeight: 7.5, rate: 195.00 },
+                    { maxWeight: 10.0, rate: 235.00 },
+                    { maxWeight: 15.0, rate: 310.00 },
+                    { maxWeight: 20.0, rate: 385.00 },
+                    { maxWeight: 25.0, rate: 460.00 },
+                    { maxWeight: 30.0, rate: 535.00 },
+                    { maxWeight: Infinity, ratePerKg: 22.00 } // For weights > 30kg
+                ]
+            },
+            international_economy: {
+                name: "FedEx International Economy®",
+                transit: "4-6 business days",
+                rates: [
+                    { maxWeight: 0.5, rate: 65.00 },
+                    { maxWeight: 1.0, rate: 72.00 },
+                    { maxWeight: 2.0, rate: 95.00 },
+                    { maxWeight: 3.0, rate: 115.00 },
+                    { maxWeight: 4.0, rate: 125.00 },
+                    { maxWeight: 5.0, rate: 135.00 },
+                    { maxWeight: 7.5, rate: 170.00 },
+                    { maxWeight: 10.0, rate: 205.00 },
+                    { maxWeight: 15.0, rate: 275.00 },
+                    { maxWeight: 20.0, rate: 345.00 },
+                    { maxWeight: 25.0, rate: 415.00 },
+                    { maxWeight: 30.0, rate: 485.00 },
+                    { maxWeight: Infinity, ratePerKg: 19.50 } // For weights > 30kg
+                ]
+            },
+            international_connect_plus: {
+                name: "FedEx International Connect Plus®",
+                transit: "2-5 business days",
+                rates: [
+                    { maxWeight: 0.5, rate: 68.00 },
+                    { maxWeight: 1.0, rate: 78.00 },
+                    { maxWeight: 2.0, rate: 100.00 },
+                    { maxWeight: 3.0, rate: 122.00 },
+                    { maxWeight: 4.0, rate: 132.00 },
+                    { maxWeight: 5.0, rate: 142.00 },
+                    { maxWeight: 7.5, rate: 180.00 },
+                    { maxWeight: 10.0, rate: 218.00 },
+                    { maxWeight: 15.0, rate: 290.00 },
+                    { maxWeight: 20.0, rate: 362.00 },
+                    { maxWeight: 25.0, rate: 434.00 },
+                    { maxWeight: 30.0, rate: 506.00 },
+                    { maxWeight: Infinity, ratePerKg: 20.50 } // For weights > 30kg
+                ],
+                surcharge: 0.90 // US Inbound Processing Fee
+            }
+        };
+
+        // Function to calculate shipping cost based on service type and billable weight
+        function calculateShippingCost(serviceType, billableWeight, targetCountry = 'USA') {
+            // Use custom rate card if available
+            if (customRateCard && customRateCard[targetCountry]) {
+                const rates = customRateCard[targetCountry];
+                for (const tier of rates) {
+                    if (billableWeight <= tier.maxWeight) {
+                        if (tier.rate) {
+                            return tier.rate;
+                        } else if (tier.ratePerKg) {
+                            return billableWeight * tier.ratePerKg;
+                        }
+                    }
+                }
+                return 0;
+            }
+
+            // Use default FedEx rate card
+            const service = RATE_CARD[serviceType];
+            if (!service) return 0;
+
+            let cost = 0;
+
+            // Find the appropriate rate tier
+            for (const tier of service.rates) {
+                if (billableWeight <= tier.maxWeight) {
+                    if (tier.rate) {
+                        cost = tier.rate;
+                    } else if (tier.ratePerKg) {
+                        cost = billableWeight * tier.ratePerKg;
+                    }
+                    break;
+                }
+            }
+
+            // Add surcharges if applicable
+            if (service.surcharge) {
+                cost += service.surcharge;
+            }
+
+            return cost;
+        }
+
+        // Product Catalog - converted from Excel data (sample of 50+ products)
+        // Note: weights are in grams (g)
+        const PRODUCT_CATALOG = [
+            {brand:"BOTOX®",name:"BOTOX® 100u",h:70,l:42,w:33,weight:33,uom:"mm",category:"Botulinum Toxins",cooler:1},
+            {brand:"BOTOX®",name:"BOTOX® 50u",h:42,l:70,w:28,weight:28,uom:"mm",category:"Botulinum Toxins",cooler:1},
+            {brand:"RADIESSE®",name:"RADIESSE® 1.5 ml",h:30,l:20,w:179,weight:179,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"LATISSE®",name:"LATISSE® 3ml",h:40,l:160,w:140,weight:140,uom:"mm",category:"Eyelash Enhancers",cooler:0},
+            {brand:"RESTYLANE®",name:"RESTYLANE® 1ml",h:30,l:60,w:48,weight:48,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"RESTYLANE®",name:"RESTYLANE® 1ml with Lidocaine",h:30,l:200,w:71,weight:71,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"JUVEDERM®",name:"JUVEDERM® ULTRA 2 with Lidocaine",h:30,l:190,w:108,weight:108,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"JUVEDERM®",name:"JUVEDERM® ULTRA 3 with Lidocaine",h:30,l:190,w:108,weight:108,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"SCULPTRA®",name:"SCULPTRA® (2 vials)",h:100,l:100,w:100,weight:100,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"DYSPORT®",name:"DYSPORT® 500u",h:30,l:80,w:27,weight:27,uom:"mm",category:"Botulinum Toxins",cooler:1},
+            {brand:"DYSPORT®",name:"DYSPORT® 300u",h:30,l:80,w:22,weight:22,uom:"mm",category:"Botulinum Toxins",cooler:1},
+            {brand:"XEOMIN®",name:"XEOMIN® 100u",h:90,l:30,w:32,weight:32,uom:"mm",category:"Botulinum Toxins",cooler:0},
+            {brand:"XEOMIN®",name:"XEOMIN® 50u",h:90,l:30,w:32,weight:32,uom:"mm",category:"Botulinum Toxins",cooler:0},
+            {brand:"BELOTERO®",name:"BELOTERO® SOFT with Lidocaine",h:40,l:190,w:45,weight:45,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"BELOTERO®",name:"BELOTERO® BALANCE",h:40,l:190,w:45,weight:45,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"TEOSYAL®",name:"TEOSYAL® ULTIMATE",h:50,l:200,w:100,weight:100,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"STYLAGE®",name:"STYLAGE® M with Lidocaine",h:60,l:170,w:111,weight:111,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"STYLAGE®",name:"STYLAGE® L with Lidocaine",h:60,l:170,w:111,weight:111,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"AZZALURE®",name:"AZZALURE® 2 vials",h:30,l:80,w:21,weight:21,uom:"mm",category:"Botulinum Toxins",cooler:1},
+            {brand:"AZZALURE®",name:"AZZALURE® 1 vial",h:30,l:80,w:16,weight:16,uom:"mm",category:"Botulinum Toxins",cooler:1},
+            {brand:"PROFHILO®",name:"PROFHILO® H+L",h:40,l:90,w:100,weight:100,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"BOCOUTURE®",name:"BOCOUTURE® 50u",h:50,l:70,w:80,weight:80,uom:"mm",category:"Botulinum Toxins",cooler:0},
+            {brand:"BOCOUTURE®",name:"BOCOUTURE® 100u",h:90,l:30,w:32,weight:32,uom:"mm",category:"Botulinum Toxins",cooler:0},
+            {brand:"PERFECTHA®",name:"PERFECTHA® DERM",h:50,l:200,w:100,weight:100,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"PERFECTHA®",name:"PERFECTHA® DEEP",h:40,l:200,w:100,weight:100,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"REVOLAX™",name:"REVOLAX™ FINE with Lidocaine",h:30,l:190,w:40,weight:40,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"REVOLAX™",name:"REVOLAX™ DEEP with Lidocaine",h:30,l:190,w:40,weight:40,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"FILLMED®",name:"FILLMED® NCTF® 135",h:5,l:3,w:21,weight:21,uom:"cm",category:"Dermal Fillers",cooler:0},
+            {brand:"REVANESSE®",name:"REVANESSE® ULTRA",h:5,l:18,w:80,weight:80,uom:"cm",category:"Dermal Fillers",cooler:0},
+            {brand:"SAYPHA®",name:"SAYPHA® FILLER",h:40,l:200,w:100,weight:100,uom:"mm",category:"Dermal Fillers",cooler:0},
+            {brand:"SAYPHA®",name:"SAYPHA® VOLUME with Lidocaine",h:40,l:200,w:100,weight:100,uom:"mm",category:"Dermal Fillers",cooler:0}
+        ];
+
+        let selectedProducts = [];
+        let customRateCard = null;  // Will store custom rates if uploaded
+        let manualRates = [];  // For manual rate entry
+
+        // Custom Product Modal
+        document.getElementById('add_custom_product_btn').addEventListener('click', function() {
+            document.getElementById('custom_product_modal').style.display = 'flex';
+        });
+
+        document.getElementById('cancel_custom_product_btn').addEventListener('click', function() {
+            document.getElementById('custom_product_modal').style.display = 'none';
+            clearCustomProductForm();
+        });
+
+        document.getElementById('save_custom_product_btn').addEventListener('click', function() {
+            const name = document.getElementById('custom_product_name').value.trim();
+            const brand = document.getElementById('custom_brand').value.trim() || 'Custom';
+            const l = parseFloat(document.getElementById('custom_length').value);
+            const w = parseFloat(document.getElementById('custom_width').value);
+            const h = parseFloat(document.getElementById('custom_height').value);
+            const uom = document.getElementById('custom_uom').value;
+            const weight = parseFloat(document.getElementById('custom_weight').value);
+            const cooler = document.getElementById('custom_cooler').checked ? 1 : 0;
+
+            if (!name || !l || !w || !h || !weight) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            const customProduct = {
+                brand: brand,
+                name: name,
+                h: h,
+                l: l,
+                w: w,
+                weight: weight,
+                uom: uom,
+                category: 'Custom Product',
+                cooler: cooler,
+                quantity: 1,
+                id: Date.now() + Math.random(),
+                isCustom: true
+            };
+
+            selectedProducts.push(customProduct);
+            updateProductsList();
+            document.getElementById('custom_product_modal').style.display = 'none';
+            clearCustomProductForm();
+        });
+
+        function clearCustomProductForm() {
+            document.getElementById('custom_product_name').value = '';
+            document.getElementById('custom_brand').value = '';
+            document.getElementById('custom_length').value = '';
+            document.getElementById('custom_width').value = '';
+            document.getElementById('custom_height').value = '';
+            document.getElementById('custom_weight').value = '';
+            document.getElementById('custom_cooler').checked = false;
+        }
+
+        // Manual Rate Entry Modal
+        document.getElementById('manual_rate_entry_btn').addEventListener('click', function() {
+            document.getElementById('manual_rate_modal').style.display = 'flex';
+        });
+
+        document.getElementById('cancel_manual_rates_btn').addEventListener('click', function() {
+            document.getElementById('manual_rate_modal').style.display = 'none';
+        });
+
+        document.getElementById('add_rate_btn').addEventListener('click', function() {
+            const country = document.getElementById('rate_country').value;
+            const weight = parseFloat(document.getElementById('rate_weight').value);
+            const price = parseFloat(document.getElementById('rate_price').value);
+
+            if (!country || !weight || !price) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            manualRates.push({ country, weight, price });
+            updateManualRatesTable();
+
+            // Clear weight and price inputs, keep country selected
+            document.getElementById('rate_weight').value = '';
+            document.getElementById('rate_price').value = '';
+        });
+
+        function updateManualRatesTable() {
+            const tbody = document.getElementById('manual_rates_tbody');
+
+            if (manualRates.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999; padding: 20px;">No rates added yet</td></tr>';
+                return;
+            }
+
+            let html = '';
+            manualRates.forEach((rate, index) => {
+                html += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px;">${rate.country}</td>
+                        <td style="padding: 8px;">${rate.weight} kg</td>
+                        <td style="padding: 8px;">$${rate.price.toFixed(2)}</td>
+                        <td style="padding: 8px; text-align: center;"><button onclick="removeManualRate(${index})" style="color: red; cursor: pointer; border: none; background: none; text-decoration: underline;">Remove</button></td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function removeManualRate(index) {
+            manualRates.splice(index, 1);
+            updateManualRatesTable();
+        }
+
+        document.getElementById('save_manual_rates_btn').addEventListener('click', function() {
+            if (manualRates.length === 0) {
+                alert('Please add at least one rate');
+                return;
+            }
+
+            customRateCard = buildCustomRateCard(manualRates);
+            displayCustomRatesSummary();
+            document.getElementById('manual_rate_modal').style.display = 'none';
+        });
+
+        // Excel File Upload
+        document.getElementById('rate_card_file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    // Note: This requires SheetJS library for full Excel support
+                    // For now, we'll show an alert that CSV is preferred
+                    alert('Excel file selected. For best compatibility, please use CSV format or Manual Rate Entry.\n\nExpected CSV format:\nCountry,Weight,Price\nUSA,1.0,75.00\nUSA,2.0,110.00');
+                } catch (error) {
+                    alert('Error reading file. Please use Manual Rate Entry or check file format.');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function buildCustomRateCard(rates) {
+            // Group rates by country
+            const byCountry = {};
+            rates.forEach(rate => {
+                if (!byCountry[rate.country]) {
+                    byCountry[rate.country] = [];
+                }
+                byCountry[rate.country].push({ maxWeight: rate.weight, rate: rate.price });
+            });
+
+            // Sort each country's rates by weight
+            Object.keys(byCountry).forEach(country => {
+                byCountry[country].sort((a, b) => a.maxWeight - b.maxWeight);
+                // Add infinity tier for weights beyond the last entry
+                const lastRate = byCountry[country][byCountry[country].length - 1];
+                byCountry[country].push({ maxWeight: Infinity, ratePerKg: lastRate.rate / lastRate.maxWeight });
+            });
+
+            return byCountry;
+        }
+
+        function displayCustomRatesSummary() {
+            document.getElementById('custom_rates_display').style.display = 'block';
+            document.getElementById('clear_custom_rates_btn').style.display = 'inline-block';
+
+            const summary = document.getElementById('custom_rates_summary');
+            const countries = Object.keys(customRateCard);
+
+            summary.innerHTML = `
+                <p style="margin: 5px 0;"><strong>Countries:</strong> ${countries.join(', ')}</p>
+                <p style="margin: 5px 0;"><strong>Total Rates:</strong> ${manualRates.length} rate entries</p>
+                <p style="margin: 5px 0; font-size: 0.9rem;">All shipping cost calculations will now use your custom rates.</p>
+            `;
+        }
+
+        document.getElementById('clear_custom_rates_btn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear the custom rate card and use default FedEx rates?')) {
+                customRateCard = null;
+                manualRates = [];
+                document.getElementById('custom_rates_display').style.display = 'none';
+                document.getElementById('clear_custom_rates_btn').style.display = 'none';
+                document.getElementById('rate_card_file').value = '';
+                updateManualRatesTable();
+            }
+        });
+
+        // Autocomplete functionality
+        document.getElementById('product_search').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            const resultsDiv = document.getElementById('autocomplete_results');
+
+            if (searchTerm.length < 2) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            const matches = PRODUCT_CATALOG.filter(p =>
+                p.name.toLowerCase().includes(searchTerm) ||
+                p.brand.toLowerCase().includes(searchTerm) ||
+                p.category.toLowerCase().includes(searchTerm)
+            ).slice(0, 10);
+
+            if (matches.length === 0) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            let html = '';
+            matches.forEach(product => {
+                html += `
+                    <div style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; hover:background: #f5f5f5;"
+                         onmouseover="this.style.background='#f5f5f5'"
+                         onmouseout="this.style.background='white'"
+                         onclick="addProduct(${PRODUCT_CATALOG.indexOf(product)})">
+                        <strong>${product.brand} ${product.name}</strong><br>
+                        <small style="color: #666;">${product.category} | ${product.l}×${product.w}×${product.h}${product.uom} | ${product.weight}g${product.cooler ? ' | ❄️ Requires Cooler' : ''}</small>
+                    </div>
+                `;
+            });
+
+            resultsDiv.innerHTML = html;
+            resultsDiv.style.display = 'block';
+        });
+
+        // Close autocomplete when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#product_search') && !e.target.closest('#autocomplete_results')) {
+                document.getElementById('autocomplete_results').style.display = 'none';
+            }
+        });
+
+        function addProduct(productIndex) {
+            const product = PRODUCT_CATALOG[productIndex];
+            selectedProducts.push({
+                ...product,
+                quantity: 1,
+                id: Date.now() + Math.random()
+            });
+
+            updateProductsList();
+            document.getElementById('product_search').value = '';
+            document.getElementById('autocomplete_results').style.display = 'none';
+        }
+
+        function updateProductsList() {
+            const listDiv = document.getElementById('products_list');
+            const headerH3 = document.querySelector('#selected_products h3');
+            headerH3.textContent = `Selected Products (${selectedProducts.length})`;
+
+            if (selectedProducts.length === 0) {
+                listDiv.innerHTML = '<p style="color: #999;">No products selected yet. Search and add products above.</p>';
+                document.getElementById('cooler_brick_section').style.display = 'none';
+                return;
+            }
+
+            // Check if any product requires cooler
+            const hasColdChainProduct = selectedProducts.some(p => p.cooler === 1);
+            document.getElementById('cooler_brick_section').style.display = hasColdChainProduct ? 'block' : 'none';
+
+            let html = '<table style="width: 100%; border-collapse: collapse;">';
+            html += '<thead><tr><th>Product</th><th>Dimensions</th><th>Weight</th><th>Qty</th><th>Action</th></tr></thead><tbody>';
+
+            selectedProducts.forEach((p, index) => {
+                html += `
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td>${p.brand} ${p.name}${p.cooler ? ' ❄️' : ''}</td>
+                        <td>${p.l}×${p.w}×${p.h} ${p.uom}</td>
+                        <td>${p.weight} g</td>
+                        <td><input type="number" min="1" value="${p.quantity}" style="width: 60px;" onchange="updateQuantity(${index}, this.value)"></td>
+                        <td><button onclick="removeProduct(${index})" style="color: red; cursor: pointer;">Remove</button></td>
+                    </tr>
+                `;
+            });
+            html += '</tbody></table>';
+            listDiv.innerHTML = html;
+        }
+
+        function updateQuantity(index, newQty) {
+            selectedProducts[index].quantity = parseInt(newQty) || 1;
+            updateProductsList();
+        }
+
+        function removeProduct(index) {
+            selectedProducts.splice(index, 1);
+            updateProductsList();
+        }
+
+        function toggleCoolerOptions() {
+            const checked = document.getElementById('requires_cooler').checked;
+            document.getElementById('cooler_options').style.display = checked ? 'block' : 'none';
+        }
+
+        // 3D Bin Packing Algorithm (First-Fit Decreasing Height)
+        document.getElementById('calculate_packing_btn').addEventListener('click', calculatePacking);
+
+        function calculatePacking() {
+            if (selectedProducts.length === 0) {
+                alert('Please add at least one product to the parcel');
+                return;
+            }
+
+            // Expand products by quantity and convert to cm
+            const items = [];
+            let totalWeight = 0;
+            let requiresCooler = false;
+
+            selectedProducts.forEach(p => {
+                for (let i = 0; i < p.quantity; i++) {
+                    const item = {
+                        name: p.name,
+                        l: p.uom === 'mm' ? p.l / 10 : p.l,  // Convert mm to cm
+                        w: p.uom === 'mm' ? p.w / 10 : p.w,  // Convert mm to cm
+                        h: p.uom === 'mm' ? p.h / 10 : p.h,  // Convert mm to cm
+                        weight: p.weight / 1000  // Convert grams to kg
+                    };
+                    items.push(item);
+                    totalWeight += item.weight;
+                    if (p.cooler === 1) requiresCooler = true;
+                }
+            });
+
+            // Add cooler bricks if cold chain products are present
+            if (requiresCooler) {
+                const brickL = parseFloat(document.getElementById('brick_length').value) || 10;
+                const brickW = parseFloat(document.getElementById('brick_width').value) || 5;
+                const brickH = parseFloat(document.getElementById('brick_height').value) || 1;
+                const brickWeight = parseFloat(document.getElementById('brick_weight').value) || 300;
+                const brickQty = parseInt(document.getElementById('brick_quantity').value) || 2;
+
+                for (let i = 0; i < brickQty; i++) {
+                    items.push({
+                        name: 'Cooler Brick',
+                        l: brickL,
+                        w: brickW,
+                        h: brickH,
+                        weight: brickWeight / 1000  // Convert grams to kg
+                    });
+                    totalWeight += (brickWeight / 1000);
+                }
+            }
+
+            // Sort items by volume (largest first) for better packing
+            items.sort((a, b) => (b.l * b.w * b.h) - (a.l * a.w * a.h));
+
+            // Calculate packed dimensions
+            const packed = packItems(items);
+
+            // DEBUG: Log packing results
+            console.log('=== PACKING DEBUG ===');
+            console.log('Items to pack:', items.length);
+            console.log('Packed dimensions:', packed);
+            console.log('Required space:', `${packed.length.toFixed(1)} × ${packed.width.toFixed(1)} × ${packed.height.toFixed(1)} cm`);
+
+            // Find smallest available box that fits
+            const INCH_TO_CM = 2.54;
+            const boxThicknessInches = requiresCooler ? (parseFloat(document.getElementById('box_wall_thickness').value) || 1) : 0;
+            const insulationPadding = requiresCooler ? (2 * boxThicknessInches * INCH_TO_CM) : 0;  // Thickness on each side
+
+            console.log('Cold chain required:', requiresCooler);
+            console.log('Insulation padding:', insulationPadding.toFixed(2), 'cm');
+            console.log('Required with padding:', `${(packed.length + insulationPadding).toFixed(1)} × ${(packed.width + insulationPadding).toFixed(1)} × ${(packed.height + insulationPadding).toFixed(1)} cm`);
+
+            let selectedBox = null;
+            let minVolume = Infinity;
+            let fitCount = 0;
+
+            // Try each available box
+            AVAILABLE_BOXES.forEach(box => {
+                const [boxL, boxW, boxH] = box;
+
+                // Calculate usable interior space (reduced by insulation if cold chain)
+                const usableL = boxL - insulationPadding;
+                const usableW = boxW - insulationPadding;
+                const usableH = boxH - insulationPadding;
+
+                // Check if packed items fit (try all rotations)
+                const fits = checkIfFits(packed, usableL, usableW, usableH);
+
+                if (fits) {
+                    fitCount++;
+                    const volume = boxL * boxW * boxH;
+                    if (volume < minVolume) {
+                        minVolume = volume;
+                        selectedBox = { length: boxL, width: boxW, height: boxH };
+                    }
+                }
+            });
+
+            console.log('Boxes that fit:', fitCount);
+            console.log('Selected box:', selectedBox);
+
+            if (!selectedBox) {
+                const maxBox = AVAILABLE_BOXES.reduce((max, box) => {
+                    const vol = box[0] * box[1] * box[2];
+                    const maxVol = max[0] * max[1] * max[2];
+                    return vol > maxVol ? box : max;
+                }, [0, 0, 0]);
+                const maxDim = Math.max(...maxBox);
+                console.log('Largest available box:', `${maxBox[0]} × ${maxBox[1]} × ${maxBox[2]} cm (max dimension: ${maxDim} cm)`);
+
+                alert(`No available box is large enough for the selected items.\n\nRequired: ${packed.length.toFixed(1)} × ${packed.width.toFixed(1)} × ${packed.height.toFixed(1)} cm\nWith insulation: ${(packed.length + insulationPadding).toFixed(1)} × ${(packed.width + insulationPadding).toFixed(1)} × ${(packed.height + insulationPadding).toFixed(1)} cm\nLargest box: ${maxBox[0]} × ${maxBox[1]} × ${maxBox[2]} cm\n\nCheck browser console for detailed debug info.`);
+                return;
+            }
+
+            displayPackingResults(selectedBox, packed, totalWeight, items.length, requiresCooler, insulationPadding);
+
+            // Auto-fill the weight field
+            document.getElementById('actual_weight').value = totalWeight.toFixed(3);
+        }
+
+        function packItems(items) {
+            if (items.length === 0) return { length: 0, width: 0, height: 0 };
+
+            console.log('packItems called with', items.length, 'items');
+            console.log('First item dimensions:', items[0]);
+
+            try {
+                // Simple layer-based packing algorithm
+                // Sort items by base area (largest first) for better packing
+                const sortedItems = [...items].sort((a, b) => (b.l * b.w) - (a.l * a.w));
+
+            let layers = [];
+            let currentLayer = { items: [], maxHeight: 0, width: 0, length: 0 };
+
+            sortedItems.forEach(item => {
+                // Try to fit item in current layer
+                if (currentLayer.items.length === 0) {
+                    // First item in layer
+                    currentLayer.items.push(item);
+                    currentLayer.length = item.l;
+                    currentLayer.width = item.w;
+                    currentLayer.maxHeight = item.h;
+                } else {
+                    // Try to add beside existing items
+                    const newLength = currentLayer.length + item.l;
+                    const newWidth = Math.max(currentLayer.width, item.w);
+
+                    // Check if adding to length is reasonable (not more than 2x current length)
+                    if (newLength <= currentLayer.length * 2.5) {
+                        currentLayer.items.push(item);
+                        currentLayer.length = newLength;
+                        currentLayer.width = newWidth;
+                        currentLayer.maxHeight = Math.max(currentLayer.maxHeight, item.h);
+                    } else {
+                        // Start new layer
+                        layers.push(currentLayer);
+                        currentLayer = {
+                            items: [item],
+                            length: item.l,
+                            width: item.w,
+                            maxHeight: item.h
+                        };
+                    }
+                }
+            });
+
+            // Add last layer
+            if (currentLayer.items.length > 0) {
+                layers.push(currentLayer);
+            }
+
+            // Calculate overall dimensions
+            const maxLength = Math.max(...layers.map(l => l.length));
+            const maxWidth = Math.max(...layers.map(l => l.width));
+            const totalHeight = layers.reduce((sum, l) => sum + l.maxHeight, 0);
+
+            console.log('Layer-based packing:', `${maxLength.toFixed(1)}×${maxWidth.toFixed(1)}×${totalHeight.toFixed(1)}`);
+
+            // Try alternative: stack items more efficiently by grouping similar sizes
+            const altPacking = packBySize(items);
+            const volume1 = maxLength * maxWidth * totalHeight;
+            const volume2 = altPacking.length * altPacking.width * altPacking.height;
+
+            console.log('Layer volume:', volume1.toFixed(0), 'cm³');
+            console.log('packBySize volume:', volume2.toFixed(0), 'cm³');
+
+            // Helper function to calculate dimensional fitness (prefer balanced dimensions)
+            const getDimensionScore = (dims) => {
+                const sorted = [dims.length, dims.width, dims.height].sort((a, b) => b - a);
+                return sorted[0] / sorted[2]; // Lower is better (more balanced)
+            };
+
+            const layerDims = { length: maxLength, width: maxWidth, height: totalHeight };
+            const layerScore = getDimensionScore(layerDims);
+            const packScore = getDimensionScore(altPacking);
+
+            console.log('Layer dimensions score:', layerScore.toFixed(2));
+            console.log('packBySize dimensions score:', packScore.toFixed(2));
+
+            // Choose packBySize if it has smaller volume OR equal volume with better dimensional fitness
+            if (volume2 < volume1 || (volume2 === volume1 && packScore < layerScore)) {
+                console.log('Using packBySize result (better fit)');
+                return altPacking;
+            }
+
+            console.log('Using layer-based result');
+            return {
+                length: maxLength,
+                width: maxWidth,
+                height: totalHeight
+            };
+            } catch (error) {
+                console.error('Error in packItems:', error);
+                console.error('Error stack:', error.stack);
+                // Fallback: simple bounding box
+                const maxL = Math.max(...items.map(i => i.l));
+                const maxW = Math.max(...items.map(i => i.w));
+                const totalH = items.reduce((sum, i) => sum + i.h, 0);
+                console.log('Using fallback packing:', `${maxL}×${maxW}×${totalH}`);
+                return { length: maxL, width: maxW, height: totalH };
+            }
+        }
+
+        function packBySize(items) {
+            // Group items by similar dimensions
+            const bricks = items.filter(item => item.name === 'Cooler Brick');
+            const products = items.filter(item => item.name !== 'Cooler Brick');
+
+            console.log('packBySize called with:', items.length, 'items');
+            console.log('Products:', products.length, 'Bricks:', bricks.length);
+
+            // Pack products in optimal grid
+            let prodL = 0, prodW = 0, prodH = 0;
+            if (products.length > 0) {
+                // Group identical products
+                const productGroups = {};
+                products.forEach(p => {
+                    const key = `${p.l}x${p.w}x${p.h}`;
+                    if (!productGroups[key]) {
+                        productGroups[key] = { dims: p, count: 0 };
+                    }
+                    productGroups[key].count++;
+                });
+
+                console.log('Product groups:', Object.keys(productGroups).length);
+                Object.entries(productGroups).forEach(([key, group]) => {
+                    console.log(`  ${key}: ${group.count} items`);
+                });
+
+                // Find best packing for each group
+                let bestProdVol = Infinity;
+                let bestProdDims = null;
+
+                Object.values(productGroups).forEach(group => {
+                    const { dims, count } = group;
+
+                    console.log(`Trying to pack ${count} items of size ${dims.l}×${dims.w}×${dims.h}`);
+
+                    // Try different grid arrangements
+                    for (let rows = 1; rows <= Math.min(count, 10); rows++) {
+                        const cols = Math.ceil(count / rows);
+
+                        // Try all 3 orientations
+                        const orientations = [
+                            { l: dims.l * cols, w: dims.w * rows, h: dims.h, desc: `${rows}×${cols} flat` },
+                            { l: dims.l * cols, w: dims.w, h: dims.h * rows, desc: `${rows} high, ${cols} wide (L)` },
+                            { l: dims.l, w: dims.w * cols, h: dims.h * rows, desc: `${rows} high, ${cols} wide (W)` }
+                        ];
+
+                        orientations.forEach(orient => {
+                            const vol = orient.l * orient.w * orient.h;
+
+                            // Helper function to calculate dimension "fitness" - prefer more balanced dimensions
+                            const getDimensionScore = (dims) => {
+                                const sorted = [dims.l, dims.w, dims.h].sort((a, b) => b - a);
+                                return sorted[0] / sorted[2]; // Lower is better (more balanced)
+                            };
+
+                            const currentScore = bestProdDims ? getDimensionScore(bestProdDims) : Infinity;
+                            const newScore = getDimensionScore(orient);
+
+                            if (vol < bestProdVol || (vol === bestProdVol && newScore < currentScore)) {
+                                console.log(`  New best: ${orient.desc} = ${orient.l.toFixed(1)}×${orient.w.toFixed(1)}×${orient.h.toFixed(1)} (${vol.toFixed(0)} cm³)`);
+                                bestProdVol = vol;
+                                bestProdDims = { l: orient.l, w: orient.w, h: orient.h };
+                            }
+                        });
+                    }
+                });
+
+                if (bestProdDims) {
+                    prodL = bestProdDims.l;
+                    prodW = bestProdDims.w;
+                    prodH = bestProdDims.h;
+                    console.log(`Best product packing: ${prodL.toFixed(1)}×${prodW.toFixed(1)}×${prodH.toFixed(1)}`);
+                } else {
+                    // Fallback: simple stacking
+                    prodL = Math.max(...products.map(p => p.l));
+                    prodW = Math.max(...products.map(p => p.w));
+                    prodH = products.reduce((sum, p) => sum + p.h, 0);
+                    console.log(`Fallback stacking: ${prodL.toFixed(1)}×${prodW.toFixed(1)}×${prodH.toFixed(1)}`);
+                }
+            }
+
+            if (bricks.length === 0) {
+                return { length: prodL, width: prodW, height: prodH };
+            }
+
+            // Pack bricks in optimal grid
+            const brick = bricks[0];
+            const n = bricks.length;
+
+            console.log(`Packing ${n} bricks of size ${brick.l}×${brick.w}×${brick.h}`);
+            console.log(`Product dimensions to combine with: ${prodL.toFixed(1)}×${prodW.toFixed(1)}×${prodH.toFixed(1)}`);
+
+            // Try to make a square-ish grid
+            let bestVol = Infinity;
+            let bestDims = null;
+
+            // Only try reasonable factorizations
+            for (let rows = 1; rows <= Math.min(n, 10); rows++) {
+                const cols = Math.ceil(n / rows);
+
+                // Try different brick orientations
+                const brickOrientations = [
+                    { l: brick.l, w: brick.w, h: brick.h, desc: 'flat' },      // 10×5×1
+                    { l: brick.l, w: brick.h, h: brick.w, desc: 'on edge' },   // 10×1×5 (standing on 1cm edge)
+                    { l: brick.w, w: brick.h, h: brick.l, desc: 'vertical' }   // 5×1×10 (standing tall)
+                ];
+
+                brickOrientations.forEach(orient => {
+                    const brickL = orient.l * cols;
+                    const brickW = orient.w * rows;
+                    const brickH = orient.h;
+
+                    console.log(`  Trying ${rows}×${cols} brick grid (${orient.desc}): ${brickL.toFixed(1)}×${brickW.toFixed(1)}×${brickH.toFixed(1)}`);
+
+                    // Try beside products
+                    const opt1 = {
+                        length: Math.max(prodL, brickL),
+                        width: prodW + brickW,
+                        height: Math.max(prodH, brickH)
+                    };
+
+                    // Try stacked on top
+                    const opt2 = {
+                        length: Math.max(prodL, brickL),
+                        width: Math.max(prodW, brickW),
+                        height: prodH + brickH
+                    };
+
+                    const vol1 = opt1.length * opt1.width * opt1.height;
+                    const vol2 = opt2.length * opt2.width * opt2.height;
+
+                    console.log(`    Beside: ${opt1.length.toFixed(1)}×${opt1.width.toFixed(1)}×${opt1.height.toFixed(1)} = ${vol1.toFixed(0)} cm³`);
+                    console.log(`    Stacked: ${opt2.length.toFixed(1)}×${opt2.width.toFixed(1)}×${opt2.height.toFixed(1)} = ${vol2.toFixed(0)} cm³`);
+
+                    // Helper function to calculate dimension "fitness" - prefer more balanced dimensions
+                    // Penalize very long/narrow boxes by calculating max dimension ratio
+                    const getDimensionScore = (dims) => {
+                        const sorted = [dims.length, dims.width, dims.height].sort((a, b) => b - a);
+                        const maxDim = sorted[0];
+                        const minDim = sorted[2];
+                        return maxDim / minDim; // Lower is better (more balanced)
+                    };
+
+                    // Check opt1 (beside)
+                    if (vol1 < bestVol || (vol1 === bestVol && getDimensionScore(opt1) < getDimensionScore(bestDims))) {
+                        bestVol = vol1;
+                        bestDims = opt1;
+                        console.log(`    → New best (beside): ${opt1.length.toFixed(1)}×${opt1.width.toFixed(1)}×${opt1.height.toFixed(1)}`);
+                    }
+
+                    // Check opt2 (stacked)
+                    if (vol2 < bestVol || (vol2 === bestVol && getDimensionScore(opt2) < getDimensionScore(bestDims))) {
+                        bestVol = vol2;
+                        bestDims = opt2;
+                        console.log(`    → New best (stacked): ${opt2.length.toFixed(1)}×${opt2.width.toFixed(1)}×${opt2.height.toFixed(1)}`);
+                    }
+                });
+            }
+
+            const finalResult = bestDims || {
+                length: prodL,
+                width: prodW,
+                height: prodH + (brick.h * n)
+            };
+            console.log(`Final packBySize result: ${finalResult.length.toFixed(1)}×${finalResult.width.toFixed(1)}×${finalResult.height.toFixed(1)}`);
+            return finalResult;
+        }
+
+        function checkIfFits(packed, boxL, boxW, boxH) {
+            // Try all 6 possible rotations of the packed items
+            const rotations = [
+                [packed.length, packed.width, packed.height],
+                [packed.length, packed.height, packed.width],
+                [packed.width, packed.length, packed.height],
+                [packed.width, packed.height, packed.length],
+                [packed.height, packed.length, packed.width],
+                [packed.height, packed.width, packed.length]
+            ];
+
+            for (const [l, w, h] of rotations) {
+                if (l <= boxL && w <= boxW && h <= boxH) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function displayPackingResults(selectedBox, packed, weight, itemCount, requiresCooler, insulationPadding) {
+            const resultsDiv = document.getElementById('packing_results');
+            const summaryDiv = document.getElementById('packing_summary');
+
+            resultsDiv.style.display = 'block';
+
+            const usableL = selectedBox.length - insulationPadding;
+            const usableW = selectedBox.width - insulationPadding;
+            const usableH = selectedBox.height - insulationPadding;
+
+            const boxThicknessInches = requiresCooler ? (parseFloat(document.getElementById('box_wall_thickness').value) || 1) : 0;
+
+            summaryDiv.innerHTML = `
+                <div class="weight-info">
+                    <div class="info-box">
+                        <strong>Items Packed</strong>
+                        ${itemCount} items
+                    </div>
+                    <div class="info-box">
+                        <strong>Total Weight</strong>
+                        ${weight.toFixed(3)} kg
+                    </div>
+                    <div class="info-box">
+                        <strong>Packed Dimensions</strong>
+                        ${packed.length.toFixed(1)} × ${packed.width.toFixed(1)} × ${packed.height.toFixed(1)} cm
+                    </div>
+                    <div class="info-box">
+                        <strong>Selected Box</strong>
+                        ${selectedBox.length} × ${selectedBox.width} × ${selectedBox.height} cm
+                    </div>
+                    ${requiresCooler ? `
+                    <div class="info-box" style="background: #e8f4f8;">
+                        <strong>❄️ Cold Chain Box</strong>
+                        Usable space: ${usableL.toFixed(1)} × ${usableW.toFixed(1)} × ${usableH.toFixed(1)} cm<br>
+                        <small>(${boxThicknessInches} inch insulation on all sides)</small>
+                    </div>
+                    ` : ''}
+                    <div class="info-box">
+                        <strong>Box Volume</strong>
+                        ${(selectedBox.length * selectedBox.width * selectedBox.height).toLocaleString()} cm³
+                    </div>
+                </div>
+                <p style="margin-top: 15px; color: #27ae60;"><strong>✓ Packing complete!</strong> Weight has been auto-filled below. You can now optimize box selection or calculate shipping rates.</p>
+            `;
+        }
+
+        // Predefined available box dimensions (cm)
+        const AVAILABLE_BOXES = [
+            [23,23,15], [25,20,10], [25,20,20], [31,21,16], [35,24,23], [23,17,11], [23,14,11], [35,23,23],
+            [22,14,11], [26,21,21], [21,13,9], [21,14,10], [24,14,12], [25,20,11], [25,21,16], [22,14,10],
+            [21,13,10], [9,13,13], [25,20,15], [23,14,12], [23,17,12], [26,21,12], [23,19,16], [23,16,11],
+            [30,20,15], [22,19,16], [25,15,12], [14,11,9], [20,12,8], [24,14,11], [23,17,11], [25,20,15],
+            [25,25,16], [25,20,10], [21,13,9], [22,14,11], [21,13,10], [24,16,11], [23,13,9], [9,13,13],
+            [21,13,9], [29,29,28], [35,24,24], [29,28,28], [28,28,28], [25,24,16], [20,12,8], [14,12,10],
+            [26,21,11], [8,12,12], [25,16,11], [25,17,12], [26,17,12], [26,21,16], [30,20,20], [32,32,32],
+            [25,25,17], [26,24,16], [9,11,11], [15,12,10], [31,20,16], [23,14,10], [23,16,12], [22,16,15],
+            [20,13,9], [22,15,14], [25,17,12], [23,16,15], [22,15,15], [23,23,16], [24,24,17], [24,24,16],
+            [25,24,17], [23,24,15], [25,24,18], [24,25,16], [25,24,16], [20,13,9], [30,21,21], [31,21,21],
+            [22,15,15], [22,15,14], [21,21,16], [23,16,15], [25,21,20], [22,16,15], [24,23,16], [26,21,16],
+            [27,28,20], [28,20,25], [24,24,16], [24,20,17], [30,20,16], [24,24,15], [25,23,16], [30,20,10],
+            [25,20,16], [31,31,17], [26,21,11], [23,19,16], [31,31,16], [24,18,12], [24,18,11], [24,17,12],
+            [31,31,16], [24,23,15], [23,24,16], [23,17,10], [20,12,9], [25,20,11], [25,20,10], [21,12,8],
+            [20,12,9], [24,24,1], [20,12,28], [24,20,15], [25,25,16], [47,47,11], [21,13,10], [23,17,9],
+            [38,28,23], [25,23,18], [35,25,24], [24,24,17], [30,20,15], [23,14,11], [24,24,15], [30,30,15],
+            [35,20,15], [7,11,11], [24,15,12], [24,14,11], [26,23,16], [31,20,15], [30,24,23], [34,24,24],
+            [30,20,20], [24,15,12], [30,20,16], [24,18,12], [30,20,16], [22,19,16], [23,17,11], [23,13,9],
+            [20,12,1], [30,30,16], [30,20,2], [21,13,20], [23,23,23], [25,20,15], [20,12,8], [23,13,11],
+            [26,25,17], [29,29,29], [23,23,15], [24,15,11], [26,21,10], [23,14,11], [23,24,18], [25,24,16],
+            [34,22,22], [43,39,26], [21,16,11], [24,20,16]
+        ];
+
+        document.getElementById('optimize_btn').addEventListener('click', optimizeDimensions);
+
+        function optimizeDimensions() {
+            const actualWeight = parseFloat(document.getElementById('actual_weight').value);
+            const maxDimension = parseFloat(document.getElementById('max_dimension').value) || null;
+            const serviceType = document.getElementById('service_type').value;
+
+            if (!actualWeight || actualWeight <= 0) {
+                alert('Please enter a valid actual weight');
+                return;
+            }
+
+            const selectedService = RATE_CARD[serviceType];
+
+            // Calculate optimal volume: actualWeight * 5000
+            const optimalVolume = actualWeight * 5000;
+
+            // Analyze all available boxes
+            const results = [];
+            const processedBoxes = new Set();
+
+            AVAILABLE_BOXES.forEach(dims => {
+                // Skip invalid dimensions
+                if (dims.some(d => d < 1 || isNaN(d))) return;
+
+                const [l, w, h] = dims.sort((a, b) => b - a); // Sort desc for consistency
+                const boxKey = `${l}x${w}x${h}`;
+
+                // Skip duplicates
+                if (processedBoxes.has(boxKey)) return;
+                processedBoxes.add(boxKey);
+
+                // Apply max dimension constraint if provided
+                if (maxDimension && l > maxDimension) return;
+
+                const volume = l * w * h;
+                const dimWeight = volume / 5000;
+                const billableWeight = Math.max(actualWeight, dimWeight);
+
+                // Calculate cost using the rate card
+                const cost = calculateShippingCost(serviceType, billableWeight);
+
+                const efficiency = (volume / optimalVolume * 100);
+                const volumeWaste = dimWeight > actualWeight ? ((dimWeight - actualWeight) / actualWeight * 100) : 0;
+
+                results.push({
+                    name: `${l} × ${w} × ${h} cm`,
+                    length: l,
+                    width: w,
+                    height: h,
+                    volume,
+                    dimWeight: dimWeight.toFixed(2),
+                    billableWeight: billableWeight.toFixed(2),
+                    cost: cost.toFixed(2),
+                    efficiency: efficiency.toFixed(1),
+                    volumeWaste: volumeWaste.toFixed(1),
+                    isOptimal: dimWeight <= actualWeight * 1.05, // Within 5% of actual weight
+                    isPerfect: Math.abs(dimWeight - actualWeight) < 0.1
+                });
+            });
+
+            displayResults(results, actualWeight, optimalVolume, selectedService);
+        }
+
+        function displayResults(results, actualWeight, optimalVolume, serviceInfo) {
+            const resultsDiv = document.getElementById('results');
+            const summaryDiv = document.getElementById('summary');
+            const recommendationsDiv = document.getElementById('recommendations');
+            const tableDiv = document.getElementById('detailed_table');
+
+            resultsDiv.style.display = 'block';
+
+            // Sort by cost first, then by volume (descending)
+            results.sort((a, b) => {
+                const costDiff = parseFloat(a.cost) - parseFloat(b.cost);
+                if (Math.abs(costDiff) < 0.01) {
+                    return b.volume - a.volume; // If same cost, prefer larger volume
+                }
+                return costDiff;
+            });
+
+            const minCost = Math.min(...results.map(r => parseFloat(r.cost)));
+            const optimalResults = results.filter(r => parseFloat(r.cost) === minCost);
+            const perfectFitBoxes = results.filter(r => r.isOptimal);
+
+            // Summary
+            summaryDiv.innerHTML = `
+                <div class="weight-info">
+                    <div class="info-box">
+                        <strong>Service Selected</strong>
+                        ${serviceInfo.name}<br>
+                        <small style="color: #666;">${serviceInfo.transit}</small>
+                    </div>
+                    <div class="info-box">
+                        <strong>Actual Weight</strong>
+                        ${actualWeight} kg
+                    </div>
+                    <div class="info-box">
+                        <strong>Optimal Volume Threshold</strong>
+                        ${optimalVolume.toLocaleString()} cm³
+                    </div>
+                    <div class="info-box">
+                        <strong>Available Boxes Analyzed</strong>
+                        ${results.length}
+                    </div>
+                    <div class="info-box">
+                        <strong>Minimum Cost</strong>
+                        $${minCost.toFixed(2)}${serviceInfo.surcharge ? ' (incl. $' + serviceInfo.surcharge.toFixed(2) + ' surcharge)' : ''}
+                    </div>
+                </div>
+            `;
+
+            // Recommendations
+            let recommendationsHtml = '<h3>Top Recommended Boxes</h3>';
+
+            // Show boxes at minimum cost, sorted by volume (largest first)
+            const topBoxes = optimalResults.slice(0, 5);
+
+            if (topBoxes.length > 0) {
+                recommendationsHtml += `<p><strong>Best Value:</strong> These boxes offer the lowest shipping cost of $${minCost.toFixed(2)}. Choose the largest for maximum packing space.</p>`;
+                topBoxes.forEach((result, index) => {
+                    const isLargest = index === 0;
+                    recommendationsHtml += `
+                        <div class="dimension-card ${isLargest ? 'optimal-card' : ''}">
+                            <h4>${result.name}${isLargest ? ' ⭐ LARGEST AT MIN COST' : ''}</h4>
+                            <p><strong>Volume:</strong> ${result.volume.toLocaleString()} cm³</p>
+                            <p><strong>Dimensional Weight:</strong> ${result.dimWeight} kg (vs ${actualWeight} kg actual)</p>
+                            <p><strong>Billable Weight:</strong> ${result.billableWeight} kg</p>
+                            <p><strong>Cost:</strong> $${result.cost}</p>
+                            ${parseFloat(result.volumeWaste) > 0 ?
+                                `<p style="color: #e67e22;"><strong>Note:</strong> Paying ${result.volumeWaste}% extra for dimensional weight</p>` :
+                                `<p style="color: #27ae60;"><strong>Efficient:</strong> Charged by actual weight only</p>`
+                            }
+                        </div>
+                    `;
+                });
+
+                // Show perfect fit boxes if they exist and are different
+                const perfectUnique = perfectFitBoxes.filter(p =>
+                    !topBoxes.some(t => t.name === p.name)
+                ).slice(0, 2);
+
+                if (perfectUnique.length > 0) {
+                    recommendationsHtml += '<h4 style="margin-top: 20px;">Alternative: Perfect Fit Boxes</h4>';
+                    recommendationsHtml += '<p>These boxes are within 5% of optimal volume (minimal waste):</p>';
+                    perfectUnique.forEach(result => {
+                        recommendationsHtml += `
+                            <div class="dimension-card">
+                                <h4>${result.name}</h4>
+                                <p><strong>Volume:</strong> ${result.volume.toLocaleString()} cm³</p>
+                                <p><strong>Cost:</strong> $${result.cost}</p>
+                                <p><strong>Dimensional Weight:</strong> ${result.dimWeight} kg</p>
+                            </div>
+                        `;
+                    });
+                }
+            } else {
+                recommendationsHtml += '<p>No boxes analyzed. Please check your input.</p>';
+            }
+
+            recommendationsDiv.innerHTML = recommendationsHtml;
+
+            // Detailed table - show top 10 results
+            const displayResults = results.slice(0, 10);
+
+            let tableHtml = `
+                <h3>Available Boxes Analysis (Top 10 by Cost)</h3>
+                <p style="color: #666; margin-bottom: 15px;">Showing best options sorted by cost, then volume. Highlighted rows have minimum shipping cost.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Dimensions (L×W×H)</th>
+                            <th>Volume (cm³)</th>
+                            <th>Dim Weight (kg)</th>
+                            <th>Billable (kg)</th>
+                            <th>Cost (USD)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            displayResults.forEach((result, index) => {
+                const isMinCost = parseFloat(result.cost) === minCost;
+                const rowClass = isMinCost ? 'highlight' : '';
+                let status = '';
+
+                if (isMinCost) {
+                    status = '🏆 Best Price';
+                } else if (result.isOptimal) {
+                    status = '✅ Optimal';
+                } else if (parseFloat(result.volumeWaste) > 20) {
+                    status = '⚠️ High Waste';
+                } else {
+                    status = '○ Available';
+                }
+
+                tableHtml += `
+                    <tr class="${rowClass}">
+                        <td>${index + 1}</td>
+                        <td>${result.length} × ${result.width} × ${result.height}</td>
+                        <td>${result.volume.toLocaleString()}</td>
+                        <td>${result.dimWeight}</td>
+                        <td>${result.billableWeight}</td>
+                        <td>$${result.cost}</td>
+                        <td>${status}</td>
+                    </tr>
+                `;
+            });
+
+            tableHtml += `
+                    </tbody>
+                </table>
+                <p style="color: #999; font-size: 0.9rem; margin-top: 10px;">
+                    Showing ${displayResults.length} of ${results.length} total available boxes.
+                </p>
+            `;
+            tableDiv.innerHTML = tableHtml;
+        }
+    </script>
+</body>
+</html>

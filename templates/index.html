@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UPC Lookup Service</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="nav-links" style="margin-bottom: 20px;">
+            <a href="/parcel-optimizer" style="color: #2196F3; text-decoration: none;">Go to Parcel Optimizer →</a>
+        </div>
+        <h1>UPC Lookup Service</h1>
+        <form id="upcForm">
+            <h2>Product Information</h2>
+            <div class="form-group">
+                <label for="upc">UPC/EAN Code</label>
+                <input type="text" id="upc" name="upc" required placeholder="e.g. 3614272049529">
+                <button type="button" id="lookup_upc">Lookup</button>
+            </div>
+            <div class="form-group">
+                <label for="product_name">Product Name</label>
+                <input type="text" id="product_name" name="product_name" readonly>
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" readonly></textarea>
+            </div>
+            <div class="form-group">
+                <label for="brand">Brand</label>
+                <input type="text" id="brand" name="brand" readonly>
+            </div>
+            <div class="form-group">
+                <label for="manufacturer">Manufacturer</label>
+                <input type="text" id="manufacturer" name="manufacturer" readonly>
+            </div>
+            <div class="form-group">
+                <label for="category">Category</label>
+                <input type="text" id="category" name="category" readonly>
+            </div>
+            <div class="form-group">
+                <label for="image_url">Image URL</label>
+                <input type="url" id="image_url" name="image_url" readonly>
+                <img id="product_image" src="" alt="" style="max-width: 200px; display: none; margin-top: 10px;">
+            </div>
+        </form>
+
+        <div id="result" class="hs-section"></div>
+        <div id="error" class="hs-section"></div>
+    </div>
+
+    <script>
+        document.getElementById('lookup_upc').addEventListener('click', async () => {
+            const upc = document.getElementById('upc').value;
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('error');
+            resultDiv.innerHTML = '';
+            errorDiv.style.display = 'none';
+
+            if (!upc) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = '<p><strong>Error:</strong> Please enter a UPC/EAN code</p>';
+                return;
+            }
+
+            try {
+                const response = await fetch('/lookup-upc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ upc })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('product_name').value = data.name || '';
+                    document.getElementById('description').value = data.description || '';
+                    document.getElementById('brand').value = data.brand || '';
+                    document.getElementById('manufacturer').value = data.manufacturer || '';
+                    document.getElementById('category').value = data.category || '';
+                    document.getElementById('image_url').value = data.image || '';
+                    const img = document.getElementById('product_image');
+                    if (data.image) {
+                        img.src = data.image;
+                        img.style.display = 'block';
+                    } else {
+                        img.style.display = 'none';
+                    }
+                    resultDiv.innerHTML = '<p>UPC/EAN lookup successful</p>';
+                } else {
+                    errorDiv.style.display = 'block';
+                    errorDiv.innerHTML = `<p><strong>Error:</strong> ${data.error}</p>`;
+                }
+            } catch (error) {
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = `<p><strong>Error:</strong> ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>
